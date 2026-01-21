@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>เกมทายคำ</title>
+
+  <!-- ================= CSS ================= -->
+  <style>
+    * { box-sizing: border-box; }
+
+    :root {
+      --vh: 1vh;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: radial-gradient(circle at top, #111827, #020617 70%);
+      color: #f9fafb;
+      height: calc(var(--vh) * 100);
+      overflow: hidden;
+    }
+
+    .game {
+      height: calc(var(--vh) * 100);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px;
+    }
+
+    /* ---------- TOP BAR ---------- */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .timer {
+      font-size: 18px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.08);
+    }
+
+    .hint {
+      font-size: 13px;
+      opacity: 0.6;
+    }
+
+    /* ---------- WORD ---------- */
+    .word-wrap {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .word {
+      width: 100%;
+      text-align: center;
+      font-size: clamp(40px, 8vw, 72px);
+      font-weight: 700;
+      padding: 48px 24px;
+      border-radius: 28px;
+      background: linear-gradient(180deg, #ffffff, #e5e7eb);
+      color: #020617;
+      box-shadow: 0 30px 60px rgba(0,0,0,0.45);
+      user-select: none;
+    }
+
+    /* เลื่อนดูผลลัพธ์ได้ */
+    .word.scrollable {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .footer-hint {
+      text-align: center;
+      font-size: 12px;
+      opacity: 0.5;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* ---------- LANDSCAPE MOBILE ---------- */
+    @media (orientation: landscape) and (max-width: 1024px) {
+      .word {
+        font-size: clamp(32px, 6vw, 56px);
+        padding: 36px 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="game">
+
+    <!-- TOP -->
+    <div class="top-bar">
+      <div class="timer">TIME <span id="time">--</span></div>
+      <div class="hint">ซ้าย = ข้าม | ขวา = ถูก</div>
+    </div>
+
+    <!-- WORD -->
+    <div class="word-wrap">
+      <div class="word" id="word">เตรียมตัว</div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer-hint">
+      แตะด้านซ้ายหรือขวาของหน้าจอ
+    </div>
+
+  </div>
+
+  <!-- ================= JS ================= -->
+  <script>
+    /* ---------- FIX SAFARI 100vh ---------- */
+    function setVh() {
+      document.documentElement.style.setProperty(
+        '--vh',
+        `${window.innerHeight * 0.01}px`
+      );
+    }
+    setVh();
+    window.addEventListener('resize', setVh);
+
+    /* ---------- DATA ---------- */
+    const words = [
+      // เครื่องดื่มทั่วไป
+      'น้ำ','น้ำเปล่า','น้ำแข็ง','น้ำแร่',
+      'น้ำอัดลม','โคล่า','สไปร์ท','แฟนต้า',
+      'น้ำโซดา','น้ำหวาน','น้ำเชื่อม',
+
+      // ชา
+      'ชา','ชาดำ','ชาเขียว','ชาอู่หลง','ชามะลิ',
+      'ชานม','ชานมไข่มุก','ชาเย็น','ชามะนาว',
+      'ชาไทย','ชาอังกฤษ','ชาญี่ปุ่น',
+
+      // กาแฟ
+      'กาแฟ','เอสเพรสโซ','อเมริกาโน','ลาเต้','คาปูชิโน',
+      'มอคค่า','กาแฟเย็น','กาแฟดำ','กาแฟนม',
+      'กาแฟโบราณ',
+
+      // นม
+      'นม','นมสด','นมรสช็อกโกแลต','นมสตรอว์เบอร์รี',
+      'นมถั่วเหลือง','นมอัลมอนด์','นมโอ๊ต',
+
+      // น้ำผลไม้
+      'น้ำส้ม','น้ำแอปเปิล','น้ำองุ่น','น้ำมะม่วง',
+      'น้ำแตงโม','น้ำมะพร้าว','น้ำสับปะรด',
+      'น้ำลิ้นจี่','น้ำฝรั่ง','น้ำมะนาว',
+
+      // เครื่องดื่มสมุนไพร
+      'น้ำกระเจี๊ยบ','น้ำเก๊กฮวย','น้ำใบเตย',
+      'น้ำอัญชัน','น้ำตะไคร้','น้ำขิง',
+
+      // เครื่องดื่มพิเศษ / อื่น ๆ
+      'โกโก้','ช็อกโกแลตร้อน','ไมโล','โอวัลติน',
+      'สมูทตี้','มิลค์เชค','โยเกิร์ตดื่ม',
+
+      // เครื่องดื่มแอลกอฮอล์ (ถ้าจะใช้)
+      'เบียร์','ไวน์','ไวน์แดง','ไวน์ขาว',
+      'ค็อกเทล','วิสกี้','วอดก้า','รัม','จิน'
+    ];
+
+    let phase = 'countdown';
+    let time = 60;
+    let countdown = 5;
+    let timer = null;
+    let currentWord = '';
+    let correctList = [];
+    let skipList = [];
+
+    /* ---------- CORE ---------- */
+    function randomWord() {
+      return words[Math.floor(Math.random() * words.length)];
+    }
+
+    function startCountdown() {
+      clearInterval(timer);
+      phase = 'countdown';
+      countdown = 5;
+      time = 60;
+      correctList = [];
+      skipList = [];
+
+      const wordEl = document.getElementById('word');
+      wordEl.classList.remove('scrollable');
+      document.getElementById('time').textContent = '--';
+      wordEl.textContent = countdown;
+
+      timer = setInterval(() => {
+        countdown--;
+        if (countdown > 0) {
+          wordEl.textContent = countdown;
+        } else {
+          clearInterval(timer);
+          startGame();
+        }
+      }, 1000);
+    }
+
+    function startGame() {
+      phase = 'playing';
+      document.getElementById('time').textContent = time;
+      nextWord();
+
+      timer = setInterval(() => {
+        time--;
+        document.getElementById('time').textContent = time;
+        if (time <= 0) {
+          clearInterval(timer);
+          endGame();
+        }
+      }, 1000);
+    }
+
+    function nextWord() {
+      currentWord = randomWord();
+      document.getElementById('word').textContent = currentWord;
+    }
+
+    function correctWord() {
+      if (phase !== 'playing') return;
+      correctList.push(currentWord);
+      nextWord();
+    }
+
+    function skipWord() {
+      if (phase !== 'playing') return;
+      skipList.push(currentWord);
+      nextWord();
+    }
+
+    function endGame() {
+      phase = 'ended';
+      document.getElementById('time').textContent = '0';
+
+      const wordEl = document.getElementById('word');
+      wordEl.classList.add('scrollable');
+
+      wordEl.innerHTML = `
+        <div style="font-size:24px;font-weight:700;margin-bottom:16px">
+          ⏱ หมดเวลา
+        </div>
+
+        <div style="font-size:15px;line-height:1.6;text-align:left">
+          <b>✔ ถูก (${correctList.length})</b><br>
+          ${correctList.join(', ') || '-'}
+          <br><br>
+          <b>➖ ข้าม (${skipList.length})</b><br>
+          ${skipList.join(', ') || '-'}
+        </div>
+
+        <div style="margin-top:24px">
+          <button
+            onclick="startCountdown()"
+            style="
+              width:100%;
+              padding:16px;
+              font-size:18px;
+              border-radius:18px;
+              border:none;
+              background:#111827;
+              color:white;
+            "
+          >
+            🔁 เริ่มใหม่
+          </button>
+        </div>
+      `;
+    }
+
+    /* ---------- TOUCH CONTROL ---------- */
+    document.body.addEventListener('click', (e) => {
+      if (phase !== 'playing') return;
+      const mid = window.innerWidth / 2;
+      e.clientX < mid ? skipWord() : correctWord();
+    });
+
+    /* ---------- START ---------- */
+    startCountdown();
+  </script>
+</body>
+</html>
